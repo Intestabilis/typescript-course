@@ -1,0 +1,6 @@
+Basically most of this features are useful for building utility/helper types
+
+There are already many utility types provided by Typescript that we can use instead of building our own
+(under the hood they're utilizing these features)
+
+https://www.typescriptlang.org/docs/handbook/utility-types.html
