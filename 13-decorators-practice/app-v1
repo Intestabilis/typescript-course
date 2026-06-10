@@ -1,0 +1,302 @@
+// enum for status
+enum ProjectStatus {
+  Active,
+  Finished,
+}
+
+//Project Type (honestly not sure why instructor used a class and not an interface for this)
+// ok he said that he want to be able to instantiate it but still ehh idk
+class Project {
+  constructor(
+    public id: string,
+    public title: string,
+    public description: string,
+    public people: number,
+    public status: ProjectStatus,
+  ) {}
+}
+
+// Listener type for listener functions
+// really just a function that works with projects in this case
+type Listener = (items: Project[]) => void;
+
+// State management (singleton pattern)
+class ProjectState {
+  private projects: Project[] = [];
+  private static instance: ProjectState;
+
+  // for subscription pattern
+  private listeners: Listener[] = [];
+
+  public addListener(listenerFunction: Listener) {
+    this.listeners.push(listenerFunction);
+  }
+
+  private onChange(relevantData: Project[]) {
+    for (const listener of this.listeners) {
+      listener(relevantData);
+    }
+  }
+
+  private constructor() {}
+
+  public static getInstance() {
+    if (this.instance) return this.instance;
+    this.instance = new ProjectState();
+    return this.instance;
+  }
+
+  public addProject(title: string, description: string, people: number) {
+    const newProject = new Project(
+      Math.random().toString(),
+      title,
+      description,
+      people,
+      ProjectStatus.Active,
+    );
+    // const newProject = {
+    //   // just for study project will do
+    //   id: Math.random().toString(),
+    //   title,
+    //   description,
+    //   people,
+    // };
+    this.projects.push(newProject);
+    // for (const listener of this.listeners) {
+    //   listener(this.projects.slice());
+    // }
+    this.onChange(this.projects.slice());
+  }
+}
+
+// singleton instance
+const projectState = ProjectState.getInstance();
+
+// validation logic
+
+// validatable object
+interface Validatable {
+  value: string | number;
+  // nullable (can just add | undefined)
+  required?: boolean;
+  minLength?: number;
+  maxLength?: number;
+  // for numbers
+  min?: number;
+  max?: number;
+}
+
+function validate(input: Validatable) {
+  let isValid = true;
+  // required check
+  if (input.required) {
+    isValid = isValid && input.value.toString().trim().length !== 0;
+  }
+  // min max length
+  if (
+    input.minLength != null &&
+    input.minLength &&
+    typeof input.value === "string"
+  ) {
+    isValid = isValid && input.value.trim().length >= input.minLength;
+  }
+  if (
+    input.maxLength != null &&
+    input.maxLength &&
+    typeof input.value === "string"
+  ) {
+    isValid = isValid && input.value.trim().length <= input.maxLength;
+  }
+  // min max for numbers
+  if (input.min != null && typeof input.value === "number") {
+    isValid = isValid && input.value >= input.min;
+  }
+  if (input.max != null && typeof input.value === "number") {
+    isValid = isValid && input.value <= input.max;
+  }
+
+  return isValid;
+}
+
+// autobind decorator
+function autobind(_: any, _2: string, descriptor: PropertyDescriptor) {
+  const originalMethod = descriptor.value;
+  const adjDescriptor: PropertyDescriptor = {
+    configurable: true,
+    get() {
+      const boundFunction = originalMethod.bind(this);
+      return boundFunction;
+    },
+  };
+  return adjDescriptor;
+}
+
+// ProjectList class
+
+class ProjectList {
+  templateElement: HTMLTemplateElement;
+  hostElement: HTMLDivElement;
+  element: HTMLElement;
+  assignedProjects: Project[];
+
+  // could use an enum there but well
+  constructor(private type: "active" | "finished") {
+    this.templateElement = <HTMLTemplateElement>(
+      document.getElementById("project-list")!
+    );
+    this.hostElement = document.getElementById("app")! as HTMLDivElement;
+    this.assignedProjects = [];
+    const importedNode = document.importNode(
+      this.templateElement.content,
+      true,
+    );
+    this.element = importedNode.firstElementChild as HTMLElement;
+    this.element.id = `${this.type}-projects`;
+    // adding as a listener
+    projectState.addListener((projects: Project[]) => {
+      const relevantProjects = projects.filter((project) => {
+        // honestly such a stupid implementation when we're already have a enum and could use that but ok I'll just follow a course ig
+        // (like I wouldn't write this all in OOP way in the first place we're literally using JS and surely could implement all this not with classes)
+        // really frustrated because of this class usage like it's so weird to use them and define shit statically like using concrete ids just in constructor and not at least passing them
+        // I understand that it's just a study project but really I am tweaking
+        if (this.type === "active") {
+          return project.status === ProjectStatus.Active;
+        }
+        // can do else if and check type there too but then have to implement smth for default return
+        else {
+          return project.status === ProjectStatus.Finished;
+        }
+      });
+      this.assignedProjects = relevantProjects;
+      this.renderProjects();
+    });
+
+    this.attach();
+    this.renderContent();
+  }
+
+  private renderProjects() {
+    const listEL = document.getElementById(
+      `${this.type}-projects-list`,
+    )! as HTMLUListElement;
+    // ofc not the best solution but at least that I can understand for study project (unlike unnecessary complex structure with classes in one fucking file)
+    listEL.innerHTML = "";
+    for (const projectItem of this.assignedProjects) {
+      const listItem = document.createElement("li");
+      listItem.textContent = projectItem.title;
+      listEL.appendChild(listItem);
+    }
+  }
+
+  private renderContent() {
+    const listId = `${this.type}-projects-list`;
+    this.element.querySelector("ul")!.id = listId;
+
+    this.element.querySelector("h2")!.textContent =
+      `${this.type.toUpperCase()} PROJECTS`;
+  }
+
+  private attach() {
+    this.hostElement.insertAdjacentElement(`beforeend`, this.element);
+  }
+}
+
+// ProjectInput class
+class ProjectInput {
+  templateElement: HTMLTemplateElement;
+  hostElement: HTMLDivElement;
+  element: HTMLFormElement;
+  titleInputElement: HTMLInputElement;
+  descriptionInputElement: HTMLInputElement;
+  peopleInputElement: HTMLInputElement;
+
+  constructor() {
+    // alternative syntax instead of "as HTMLTemplateElement"
+    this.templateElement = <HTMLTemplateElement>(
+      document.getElementById("project-input")!
+    );
+    this.hostElement = document.getElementById("app")! as HTMLDivElement;
+
+    const importedNode = document.importNode(
+      this.templateElement.content,
+      true,
+    );
+    this.element = importedNode.firstElementChild as HTMLFormElement;
+    this.element.id = "user-input";
+    this.titleInputElement = this.element.querySelector(
+      "#title",
+    ) as HTMLInputElement;
+    this.descriptionInputElement = this.element.querySelector(
+      "#description",
+    ) as HTMLInputElement;
+    this.peopleInputElement = this.element.querySelector(
+      "#people",
+    ) as HTMLInputElement;
+    this.configure();
+    this.attach();
+  }
+
+  private gatherUserInput(): [string, string, number] | void {
+    const enteredTitle = this.titleInputElement.value;
+    const enteredDescription = this.descriptionInputElement.value;
+    const enteredPeople = this.peopleInputElement.value;
+
+    // validation
+    const titleValidatable: Validatable = {
+      value: enteredTitle,
+      required: true,
+    };
+    const descriptionValidatable: Validatable = {
+      value: enteredDescription,
+      required: true,
+      minLength: 5,
+    };
+    const peopleValidatable: Validatable = {
+      value: +enteredPeople,
+      required: true,
+      min: 1,
+      max: 6,
+    };
+    if (
+      !validate(titleValidatable) ||
+      !validate(descriptionValidatable) ||
+      !validate(peopleValidatable)
+    ) {
+      alert("Invalid input, please, try again");
+      return;
+    } else {
+      return [enteredTitle, enteredDescription, +enteredPeople];
+    }
+  }
+
+  private clearInputs() {
+    this.titleInputElement.value = "";
+    this.descriptionInputElement.value = "";
+    this.peopleInputElement.value = "";
+  }
+
+  @autobind
+  private submitHandler(event: Event) {
+    event.preventDefault();
+    const userInput = this.gatherUserInput();
+    // checking if returned input is correct (I would prefer a guard clause with !userInput check tbh)
+    // checking for array since tuple in fact is an array
+    if (Array.isArray(userInput)) {
+      const [title, description, people] = userInput;
+      projectState.addProject(title, description, people);
+      this.clearInputs();
+    }
+  }
+
+  private configure() {
+    this.element.addEventListener("submit", this.submitHandler);
+  }
+
+  private attach() {
+    this.hostElement.insertAdjacentElement(`afterbegin`, this.element);
+  }
+}
+
+const input = new ProjectInput();
+const activeList = new ProjectList("active");
+const finishedList = new ProjectList("finished");
